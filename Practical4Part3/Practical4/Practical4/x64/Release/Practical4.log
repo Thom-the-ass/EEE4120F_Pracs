@@ -1,0 +1,7 @@
+﻿  Practical4.cpp
+C:\Users\tlgwo\Documents\UCT\4th Year\EEE4120F\Practical4Part3\Practical4\Practical4.cpp(73,11): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 152 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  Practical4.vcxproj -> C:\Users\tlgwo\Documents\UCT\4th Year\EEE4120F\Practical4Part3\Practical4\x64\Release\Practical4.exe
