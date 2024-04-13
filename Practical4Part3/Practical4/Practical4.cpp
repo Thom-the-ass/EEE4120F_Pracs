@@ -24,8 +24,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#define  ARRAYSIZE	20000
-#define  MASTER		0
+#define  MASTER	0
 
 
 
@@ -35,6 +34,7 @@
 
 /*
 * This function takes in data from the csv generated from matlab to create a matrix
+* don't know if I need this anymore
 */
 std::vector<std::vector<int>> csvToVec(std::string filename) {
     std::ifstream file(filename);
@@ -82,6 +82,30 @@ std::vector<std::vector<int>> csvToVec(std::string filename) {
     return matrix;
 }
 
+void vecToCsv(std::vector<double>&time, std::string& filename) {
+    std::ofstream outFile(filename); // Open the output file
+
+    if (!outFile.is_open()) {
+        std::cerr << "Error opening file: " << filename << std::endl;
+        return;
+    }
+
+    for (int i = 0; i < time.size(); ++i) {
+        if (i != 0&& time[i] != 0)
+        {
+            outFile << ",";
+        }
+
+        if (time[i] != 0) {
+            outFile << time[i]; // Write the index to the file
+           
+        }
+    }
+
+    outFile.close(); // Close the file
+    std::cout << "Indexes written to " << filename << std::endl;
+}
+
 
 /*
 Sorts a single row of the two by two matrix
@@ -100,48 +124,129 @@ std::vector<int> bubbleSortRow(std::vector<int>& arr) {
 }
 
 /*
-Test code be here
-*/
+Run with:
+mpiexec -n <number of proccessors> Practical4.exe <textfile to read from> <file to write to>
 
-int main()
+The directory of interest is:
+cd \Users\tlgwo\Documents\UCT\4th Year\EEE4120F\Practical4Part3\Practical4\x64\Debug
+
+mpiexec -n 4 Practical4.exe 10x10Matrix.csv 10x10Times.csv
+*/
+int main(int argc, char* argv[])
 {
-    //Getting all the data I need from the console
-    std::string readFileName;
-    std::string writeFileName;
-    std::cout << "Welcome to the thunderdome \n";
-    std::cout << "Please Give me a file to read data from: \n";
-    std::cin >> readFileName;
-    std::cout << "Please Give me a file name to write to: \n";
-    std::cin >> writeFileName;
-    std::cout << "Let the games begin";
-    return 0;
+    /***** Initializations *****/
+    std::vector<std::vector<int>> matrix;
+    int numtasks, taskid, rc, dest, offset, tag1, tag2, source, chunksize, leftover, arraySize;
+    double time;
 
+    MPI_Init(&argc, &argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
+    MPI_Status status;
 
-}
+    tag2 = 1;
+    tag1 = 2;
 
-/*
-    std::vector<std::vector<int>> matrix = csvToVec("10x10Matrix.csv");
-    std::vector<int> sortedArray = bubbleSortRow(matrix[0]);
-
-
-    for (int index : sortedArray)
+    /*Getting Data from the csvFile */
+    std::string readFile = argv[1];
+    std::string writeFile = argv[2];
+   
+    //trying to just send the data in main instead of this
+    
+    matrix = csvToVec(readFile);
+    arraySize = matrix.size();
+    chunksize = (arraySize / numtasks);
+    leftover = (arraySize % numtasks);
+    
+    if (taskid == MASTER)
     {
-        std::cout << index << "\n";
-    }
 
-*/
-
-/*
-    // Print the matrix
-    for (int i = 0; i < matrix.size(); i++) {
-        for (int j = 0; j < matrix[i].size(); j++) {
-            std::cout << matrix[i][j] << " ";
+        double ti = MPI_Wtime();
+        std::vector<double> allTimes(arraySize);
+        
+        //displaying the unsorted matrix
+        std::cout << "Unsorted Matrix is shown below: \n";
+        for (int i = 0; i < arraySize; i++)
+        {
+            for (int j = 0; j < arraySize; j++)
+            {
+                std::cout << matrix[i][j] << " ";
+            }
+            std::cout << "\n";
         }
-        std::cout << "\n";
+        //sending the data to be sorted
+        offset = 0;
+        for (dest = 1; dest < numtasks; dest++) {
+            //sending the offset
+            MPI_Send(&offset, 1, MPI_INT, dest, tag1, MPI_COMM_WORLD);
+           /*Havent got these working yet, I think for this to work will need to do a 1xX array - luss
+            MPI_Send(&arraySize, 1, MPI_INT, dest, 3, MPI_COMM_WORLD);
+            MPI_Send(&chunksize, 1, MPI_INT, dest, 4, MPI_COMM_WORLD);
+            MPI_Send(&matrix[offset], chunksize, MPI_INT, dest, tag2, MPI_COMM_WORLD);
+            */
+            offset+=chunksize;
+        }
+        //Master doing its section of the work, sorting its chunk and an additional leftover
+        std::cout << "Master is busy doing work \n";
+       
+        for(int j = 0; j < chunksize+leftover; j++)
+        {
+            matrix[offset +j]= bubbleSortRow(matrix[offset + j]);
+            std::cout << "Sorthing matrix row" << (offset + j) << "\n";
+        }
+        double tf = MPI_Wtime();
+        allTimes[0] = (tf - ti) * 1000;
+       
+        //reciving the data 
+        for (int i = 1; i < numtasks; i++) {
+            source = i;
+            MPI_Recv(&time, 1, MPI_DOUBLE, source, tag2, MPI_COMM_WORLD, &status);
+            allTimes[i] = time;
+            std::cout << "\nThe time elapsed by "<<source<< " is: " << allTimes[i];
+        }
+
+        //writingData to csv
+        vecToCsv(allTimes, writeFile);
+        //displaying the sortedMatrix
+        std::cout << "Sorted Matrix is shown below: \n";
+        for (int i = 0; i < arraySize; i++)
+        {
+            for (int j = 0; j < arraySize; j++)
+            {
+                std::cout << matrix[i][j] << " ";
+            }
+            std::cout << "\n";
+        }
+
     }
+
+    if (taskid > MASTER) {
+        double ti = MPI_Wtime();
+        MPI_Recv(&offset, 1, MPI_INT, MASTER, tag1, MPI_COMM_WORLD, &status);
+        /*
+        MPI_Recv(&arraySize, 1, MPI_INT, MASTER, 3, MPI_COMM_WORLD, &status);
+        
+        //MPI_Recv(&chunksize, 1, MPI_INT, MASTER, 4, MPI_COMM_WORLD, &status);
+        chunksize = (arraySize / numtasks);
+        MPI_Recv(&matrix[offset][1], chunksize, MPI_INT, MASTER, tag2, MPI_COMM_WORLD, &status);
+        */
+        
+        std::cout << "Worker Number " << taskid << "Hasn't shat itself \n";
+        
+        for (int i = 0; i < chunksize; i++)
+        {
+            matrix[offset + i]= bubbleSortRow(matrix[offset+i]);
+            std::cout << "Sorthing matrix row" << (offset + i)<<"\n";
+        }
+        double time = (MPI_Wtime() - ti)*1000;
+        MPI_Send(&time, 1, MPI_DOUBLE, MASTER, tag2, MPI_COMM_WORLD);
+
+    } /* end of non-master */
+    //
+    MPI_Finalize();
 
     return 0;
-*/
+}   /* end of main */
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
 // Debug program: F5 or Debug > Start Debugging menu
