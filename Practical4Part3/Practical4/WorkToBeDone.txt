@@ -1,0 +1,10 @@
+Current progress 
+executing file with allocated workers and file
+
+current problem is that I can;t seem to sent the address of the vector array to the workers
+	can sort the array and then send it back line by line -> not the most effcient but should work
+
+
+Next task is to send the data to a text file
+
+

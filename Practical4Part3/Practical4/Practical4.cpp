@@ -132,10 +132,11 @@ cd \Users\tlgwo\Documents\UCT\4th Year\EEE4120F\Practical4Part3\Practical4\x64\D
 
 mpiexec -n 4 Practical4.exe 10x10Matrix.csv 10x10Times.csv
 */
+std::vector<std::vector<int>> matrix;
 int main(int argc, char* argv[])
 {
     /***** Initializations *****/
-    std::vector<std::vector<int>> matrix;
+    
     int numtasks, taskid, rc, dest, offset, tag1, tag2, source, chunksize, leftover, arraySize;
     double time;
 
@@ -160,29 +161,18 @@ int main(int argc, char* argv[])
     
     if (taskid == MASTER)
     {
-
         double ti = MPI_Wtime();
         std::vector<double> allTimes(arraySize);
         
-        //displaying the unsorted matrix
-        std::cout << "Unsorted Matrix is shown below: \n";
-        for (int i = 0; i < arraySize; i++)
-        {
-            for (int j = 0; j < arraySize; j++)
-            {
-                std::cout << matrix[i][j] << " ";
-            }
-            std::cout << "\n";
-        }
         //sending the data to be sorted
         offset = 0;
         for (dest = 1; dest < numtasks; dest++) {
             //sending the offset
             MPI_Send(&offset, 1, MPI_INT, dest, tag1, MPI_COMM_WORLD);
            /*Havent got these working yet, I think for this to work will need to do a 1xX array - luss
-            MPI_Send(&arraySize, 1, MPI_INT, dest, 3, MPI_COMM_WORLD);
-            MPI_Send(&chunksize, 1, MPI_INT, dest, 4, MPI_COMM_WORLD);
-            MPI_Send(&matrix[offset], chunksize, MPI_INT, dest, tag2, MPI_COMM_WORLD);
+            MPI_Send(&arraySize, 1, MPI_INT, dest, 2, MPI_COMM_WORLD);
+            MPI_Send(&chunksize, 1, MPI_INT, dest, 3, MPI_COMM_WORLD);
+            MPI_Send(&matrix[offset][0], chunksize, MPI_INT, dest, 4, MPI_COMM_WORLD);
             */
             offset+=chunksize;
         }
@@ -192,7 +182,6 @@ int main(int argc, char* argv[])
         for(int j = 0; j < chunksize+leftover; j++)
         {
             matrix[offset +j]= bubbleSortRow(matrix[offset + j]);
-            std::cout << "Sorthing matrix row" << (offset + j) << "\n";
         }
         double tf = MPI_Wtime();
         allTimes[0] = (tf - ti) * 1000;
@@ -202,49 +191,37 @@ int main(int argc, char* argv[])
             source = i;
             MPI_Recv(&time, 1, MPI_DOUBLE, source, tag2, MPI_COMM_WORLD, &status);
             allTimes[i] = time;
-            std::cout << "\nThe time elapsed by "<<source<< " is: " << allTimes[i];
         }
 
         //writingData to csv
         vecToCsv(allTimes, writeFile);
-        //displaying the sortedMatrix
-        std::cout << "Sorted Matrix is shown below: \n";
-        for (int i = 0; i < arraySize; i++)
-        {
-            for (int j = 0; j < arraySize; j++)
-            {
-                std::cout << matrix[i][j] << " ";
-            }
-            std::cout << "\n";
-        }
-
     }
 
     if (taskid > MASTER) {
         double ti = MPI_Wtime();
         MPI_Recv(&offset, 1, MPI_INT, MASTER, tag1, MPI_COMM_WORLD, &status);
         /*
-        MPI_Recv(&arraySize, 1, MPI_INT, MASTER, 3, MPI_COMM_WORLD, &status);
+        MPI_Recv(&arraySize, 1, MPI_INT, MASTER, 2, MPI_COMM_WORLD, &status);
         
-        //MPI_Recv(&chunksize, 1, MPI_INT, MASTER, 4, MPI_COMM_WORLD, &status);
+        MPI_Recv(&chunksize, 1, MPI_INT, MASTER, 3, MPI_COMM_WORLD, &status);
         chunksize = (arraySize / numtasks);
-        MPI_Recv(&matrix[offset][1], chunksize, MPI_INT, MASTER, tag2, MPI_COMM_WORLD, &status);
-        */
+        MPI_Recv(&matrix[offset][0], chunksize, MPI_INT, MASTER, 4, MPI_COMM_WORLD, &status);*/
+        
         
         std::cout << "Worker Number " << taskid << "Hasn't shat itself \n";
         
         for (int i = 0; i < chunksize; i++)
         {
-            matrix[offset + i]= bubbleSortRow(matrix[offset+i]);
-            std::cout << "Sorthing matrix row" << (offset + i)<<"\n";
+            matrix[offset + i] = bubbleSortRow(matrix[offset+i]);
         }
         double time = (MPI_Wtime() - ti)*1000;
         MPI_Send(&time, 1, MPI_DOUBLE, MASTER, tag2, MPI_COMM_WORLD);
 
+      
+
     } /* end of non-master */
     //
     MPI_Finalize();
-
     return 0;
 }   /* end of main */
 
