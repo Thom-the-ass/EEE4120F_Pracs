@@ -88,7 +88,7 @@ void vecToCsv(std::vector<double>&time, std::string& filename) {
     if (!outFile.is_open()) {
         std::cerr << "Error opening file: " << filename << std::endl;
         return;
-    }
+    } 
 
     for (int i = 0; i < time.size(); ++i) {
         if (i != 0&& time[i] != 0)
@@ -135,12 +135,16 @@ mpiexec -n 4 Practical4.exe 10x10Matrix.csv 10x10Times.csv
 std::vector<std::vector<int>> matrix;
 int main(int argc, char* argv[])
 {
+   
+   
     /***** Initializations *****/
     
     int numtasks, taskid, rc, dest, offset, tag1, tag2, source, chunksize, leftover, arraySize;
     double time;
+   
 
     MPI_Init(&argc, &argv);
+    double startTime = MPI_Wtime();
     MPI_Comm_size(MPI_COMM_WORLD, &numtasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
     MPI_Status status;
@@ -192,7 +196,7 @@ int main(int argc, char* argv[])
             MPI_Recv(&time, 1, MPI_DOUBLE, source, tag2, MPI_COMM_WORLD, &status);
             allTimes[i] = time;
         }
-
+        allTimes[numtasks + 1] = (MPI_Wtime() - startTime) * 1000;
         //writingData to csv
         vecToCsv(allTimes, writeFile);
     }
@@ -208,7 +212,7 @@ int main(int argc, char* argv[])
         MPI_Recv(&matrix[offset][0], chunksize, MPI_INT, MASTER, 4, MPI_COMM_WORLD, &status);*/
         
         
-        std::cout << "Worker Number " << taskid << "Hasn't shat itself \n";
+        std::cout << "Worker Number " << taskid << " is trying its best... \n";
         
         for (int i = 0; i < chunksize; i++)
         {
