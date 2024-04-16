@@ -1,0 +1,2 @@
+﻿  Practical4.cpp
+C:\Users\portm\Documents\GitHub\EEE4120F_Pracs\Practical4Part3\Practical4\Practical4.cpp(22,10): fatal error C1083: Cannot open include file: 'mpi.h': No such file or directory
