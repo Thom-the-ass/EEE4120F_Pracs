@@ -1,0 +1,15 @@
+We are making a TSC to read data from an adc
+
+input lines 
+*clk (updates on posedge)
+*trigger
+*reads from 8 bit reg
+* has a 32 bit timer register
+* 32 bit ring buffer
+
+trigger occurs when then the a value from input is greater than the configures trigger threshold
+
+when it has been triggered, the current timer value (stored in TRIGTM register)
+
+
+see block diagram in prac 5
