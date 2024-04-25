@@ -17,14 +17,15 @@ ready
     input wire start;
     input wire reset;
     input wire sendBuf;
-    input wire [0:7] data;
+    input wire [7:0] data;
     input wire trig;
 
     //----declaring the outputs
-    output wire requestToSend;
-    output wire completeData; 
-    output reg [31:0] triggerMeasurements
+    output reg requestToSend;
+    output reg completeData; 
+    output reg [31:0] triggerMeasurements;
     output wire ready;
+    output wire sd; //serial data output
 
     //---- declaring the internal registers
 
@@ -35,45 +36,49 @@ ready
     
 
     //making local params for readability of the states
-    local params IDLE = 3'b000; 
-    local params RUNNING = 3'b001;
-    local params TRIGGERED = 3'b010;
-    local params SENDBUFFER = 3'b011;
-    local params RESET = 3'b100;
+    localparam  IDLE = 3'b000,
+                RUNNING = 3'b001,
+                TRIGGERED = 3'b010,
+                SENDBUFFER = 3'b011,
+                RESET = 3'b100;
     
     //setting the current state into the IDLE
-    //This is essentially sudo code at the moment -> will clean up after the idea makes sence
     reg [0:3] currentState = RESET;
 
-    always@(posedge clk)
-    case (currentState)
-        RESET: begin
-            //resets all the values
-            currentState <= IDLE;
-            head <= 32'h0;
-            tao; <= 32'h0;
-            triggerDetected <= 1'b0;
-            completeData <= 1'b0;
-        end
-        IDLE: begin
-            if(start) //go to running mode
-                currentState <= RUNNING;
-            end
-            if(reset) //go to reset mode
-                currentState <= RESET;
-            end
-            if(sendBuf) //go to sendBuffer mode
-                currentState <= SENDBUFFER;
-            end
-        end
-        RUNNING: begin
-            
 
-            currentState <= IDLE
-        end
-        SENDBUFFER: begin
+    //Reset on clock, not sure if we need this but need to transition states using this always@() style
+    always@(posedge clk) begin
+        case (currentState)
+            RESET: begin
+                //resets all the values
+                currentState <= IDLE;
+                head <= 32'h0;
+                tail; <= 32'h0;
+                triggerDetected <= 1'b0;
+                completeData <= 1'b0;
+            end
+            IDLE: begin
+                if(start) //go to running mode
+                    currentState <= RUNNING;
+                end
+                if(reset) //go to reset mode
+                    currentState <= RESET;
+                end
+                if(sendBuf) //go to sendBuffer mode
+                    currentState <= SENDBUFFER;
+                end
+            end
+            RUNNING: begin
+                
 
-            currentState <= IDLE
-        end
-    endcase 
+                currentState <= IDLE
+            end
+            SENDBUFFER: begin
+
+                currentState <= IDLE
+            end
+        endcase 
+    end
+
+
 endmodule;
