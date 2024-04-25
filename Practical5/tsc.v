@@ -66,5 +66,14 @@ ready
                 currentState <= SENDBUFFER;
             end
         end
+        RUNNING: begin
+            
+
+            currentState <= IDLE
+        end
+        SENDBUFFER: begin
+
+            currentState <= IDLE
+        end
     endcase 
 endmodule;
