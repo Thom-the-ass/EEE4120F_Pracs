@@ -1,32 +1,33 @@
 
 module tsc ( 
-clk, 
-start, 
-reset, 
-sendBuf, 
-data,
-trig,
-requestToSend,
-completeData,
-triggerMeasurements,
-ready
+                //clk, 
+                //start, 
+                //reset, 
+                //sendBuf, 
+                //data,
+                //trig,
+                //requestToSend,
+                /completeData,
+                //triggerMeasurements,
+                //ready
+
+    // -----declaring the ADC comms         
+    input reg rdy,      // Ready signal from ADC
+    input reg [7:0] dat // Data input from the ADC array   
+    output wire req,      // Request signal to ADC
+    output wire rst,      // Reset signal for ADC
+
+    // -----declaring the ext device comms
+    input wire clk,
+    input wire start,
+    input wire reset,
+    input wire SBF,
+    output reg [31:0] CD, 
+    output wire TRD,
+    output wire SD //serial data output
+
+
 );
-
-    // -----declaring the inputs
-    input wire clk;
-    input wire start;
-    input wire reset;
-    input wire sendBuf;
-    input wire [7:0] data;
-    input wire trig;
-
-    //----declaring the outputs
-    output reg requestToSend;
-    output reg completeData; 
-    output reg [31:0] triggerMeasurements;
-    output wire ready;
-    output wire sd; //serial data output
-
     //---- declaring the internal registers
 
     reg [0:31] timer;
@@ -36,28 +37,43 @@ ready
     
 
     //making local params for readability of the states
-    localparam  IDLE = 3'b000,
-                RUNNING = 3'b001,
+    localparam  RESET = 3'b100,
+                IDLE = 3'b000,
+                RECORD = 3'b001,
                 TRIGGERED = 3'b010,
-                SENDBUFFER = 3'b011,
-                RESET = 3'b100;
+                SENDBUFFER = 3'b011;
+                
     
     //setting the current state into the IDLE
     reg [0:3] currentState = RESET;
 
 
+    //startup conditions
+    initial
+        begin
+           currentState <= RESET; 
+        end
+
+
     //Reset on clock, not sure if we need this but need to transition states using this always@() style
+    always@(posedge reset) begin
+        currentState <= RESET;
+        //resets all the values
+        currentState <= IDLE;
+        head <= 32'h0;
+         tail; <= 32'h0;
+        triggerDetected <= 1'b0;
+        completeData <= 1'b0;
+    end
+
+    always@(posedge start) begin
+        currentState <= START;
+    end
+
     always@(posedge clk) begin
         case (currentState)
-            RESET: begin
-                //resets all the values
-                currentState <= IDLE;
-                head <= 32'h0;
-                tail; <= 32'h0;
-                triggerDetected <= 1'b0;
-                completeData <= 1'b0;
-            end
             IDLE: begin
+                //Read ADC value here and compare to threshhold
                 if(start) //go to running mode
                     currentState <= RUNNING;
                 end
@@ -68,12 +84,8 @@ ready
                     currentState <= SENDBUFFER;
                 end
             end
-            RUNNING: begin
+            RECORD: begin
                 
-
-                currentState <= IDLE
-            end
-            SENDBUFFER: begin
 
                 currentState <= IDLE
             end
