@@ -1,3 +1,7 @@
+//still to do:
+// implement the head and tail buffer correctly
+
+
 
 module tsc ( 
                 //clk, 
@@ -7,13 +11,13 @@ module tsc (
                 //data,
                 //trig,
                 //requestToSend,
-                /completeData,
+                //completeData,
                 //triggerMeasurements,
                 //ready
 
     // -----declaring the ADC comms         
-    input reg rdy,      // Ready signal from ADC
-    input reg [7:0] dat // Data input from the ADC array   
+    input wire rdy,      // Ready signal from ADC
+    input wire [7:0] dat, // Data input from the ADC array   
     output wire req,      // Request signal to ADC
     output wire rst,      // Reset signal for ADC
 
@@ -31,7 +35,9 @@ module tsc (
     //---- declaring the internal registers
 
     reg [0:31] timer;
-    reg [0:31] trigVal
+    reg [0:7] trigVal =8'hD5; // hardcoded value for trigger -> see prac 5
+   
+    reg [0:31] trigTM; //this will store the time when triggered
     //need to make a ring buffer somehow not sure if this is the correct order
     reg [0:31] ringBuf [0:8];
     
@@ -45,7 +51,7 @@ module tsc (
                 
     
     //setting the current state into the IDLE
-    reg [0:3] currentState = RESET;
+    reg [0:4] currentState = RESET;
 
 
     //startup conditions
@@ -60,8 +66,8 @@ module tsc (
         currentState <= RESET;
         //resets all the values
         currentState <= IDLE;
-        head <= 32'h0;
-         tail; <= 32'h0;
+        head <= 5'h0;
+        tail <= 5'h0;
         triggerDetected <= 1'b0;
         completeData <= 1'b0;
     end
@@ -70,11 +76,15 @@ module tsc (
         currentState <= START;
     end
 
+    always@(posedge sendBuf) begin
+        currentState <= SENDBUFFER;
+    end
+
     always@(posedge clk) begin
         case (currentState)
             IDLE: begin
                 //Read ADC value here and compare to threshhold
-                if(start) //go to running mode
+              /*  if(start) //go to running mode
                     currentState <= RUNNING;
                 end
                 if(reset) //go to reset mode
@@ -82,13 +92,48 @@ module tsc (
                 end
                 if(sendBuf) //go to sendBuffer mode
                     currentState <= SENDBUFFER;
-                end
+                end*/
             end
             RECORD: begin
+                timer <= timer +1; // increment the clock
+                ringBuf[tail] <= dat; // store the data in the ring buffer 
+                tail <= (tail+1)%32; //increment the tail   
+                if(tail >= head) // if it has gone around the loop shift 
+                    head <= (head +1) % 32;
+                end
                 
-
-                currentState <= IDLE
+                if(dat > trigVal)  //now need to shift into a new state if the trigger value is high enough
+                    trigTM = timer;
+                    currentState => TRIGGERED;
+                end
+                currentState <= IDLE;    
             end
+            TRIGGERED: begin
+                //needs to store the next 16 values from adc
+                if((trigTM - timer)> 16)
+                    ringBuf[tail] <= dat;
+                    tail <= tail+1;
+                    timer <= timer +1;//increment the timer
+                else
+                    currentState <= IDLE;
+                    TRD = 1'b1;
+                    SD <= 1'b0; //start condition
+                    CD <= 1'b0; // not complete
+                end
+            end
+            SENDBUFFER: begin
+            //needs to send ring buff out via SD Lin
+                if(tail!=head)
+                    SD <= 1'b0; //start bit
+                    SD <= ringBuf[tail];
+                    if(tail ==0) // this will allow the buffer to loop around and not go negative
+                        tail <=32;
+                    end
+                    tail <= tail -1;
+                end
+                CD <= 1'b0; //data sent through 
+            end    
+
         endcase 
     end
 
