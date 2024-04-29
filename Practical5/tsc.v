@@ -27,8 +27,8 @@ module tsc (
     input wire reset,
     input wire SBF,
     output reg [31:0] CD, 
-    output wire TRD,
-    output wire SD //serial data output
+    output reg TRD,
+    output reg SD //serial data output
 
 
 );
@@ -40,7 +40,8 @@ module tsc (
     reg [0:31] trigTM; //this will store the time when triggered
     //need to make a ring buffer somehow not sure if this is the correct order
     reg [0:31] ringBuf [0:8];
-    
+    reg [0:4]  head;
+    reg [0:4] tail;
 
     //making local params for readability of the states
     localparam  RESET = 3'b100,
@@ -51,7 +52,7 @@ module tsc (
                 
     
     //setting the current state into the IDLE
-    reg [0:4] currentState = RESET;
+    reg [0:5] currentState = RESET;
 
 
     //startup conditions
@@ -68,15 +69,15 @@ module tsc (
         currentState <= IDLE;
         head <= 5'h0;
         tail <= 5'h0;
-        triggerDetected <= 1'b0;
-        completeData <= 1'b0;
+        TRD <= 1'b0;
+        CD <= 1'b0;
     end
 
     always@(posedge start) begin
-        currentState <= START;
+        currentState <= RECORD;
     end
 
-    always@(posedge sendBuf) begin
+    always@(posedge SBF) begin
         currentState <= SENDBUFFER;
     end
 
@@ -98,23 +99,23 @@ module tsc (
                 timer <= timer +1; // increment the clock
                 ringBuf[tail] <= dat; // store the data in the ring buffer 
                 tail <= (tail+1)%32; //increment the tail   
-                if(tail >= head) // if it has gone around the loop shift 
+                if(tail >= head) begin // if it has gone around the loop shift 
                     head <= (head +1) % 32;
-                end
-                
-                if(dat > trigVal)  //now need to shift into a new state if the trigger value is high enough
-                    trigTM = timer;
-                    currentState => TRIGGERED;
+                end    
+                if(dat > trigVal) begin //now need to shift into a new state if the trigger value is high enough
+                    trigTM <= timer;
+                    currentState <= TRIGGERED;
                 end
                 currentState <= IDLE;    
             end
             TRIGGERED: begin
                 //needs to store the next 16 values from adc
-                if((trigTM - timer)> 16)
+                if((trigTM - timer)> 16) begin
                     ringBuf[tail] <= dat;
-                    tail <= tail+1;
+                    tail <= tail+ 1'b1;
                     timer <= timer +1;//increment the timer
-                else
+                end
+                else begin
                     currentState <= IDLE;
                     TRD = 1'b1;
                     SD <= 1'b0; //start condition
@@ -123,10 +124,10 @@ module tsc (
             end
             SENDBUFFER: begin
             //needs to send ring buff out via SD Lin
-                if(tail!=head)
+                if(tail!=head) begin
                     SD <= 1'b0; //start bit
                     SD <= ringBuf[tail];
-                    if(tail ==0) // this will allow the buffer to loop around and not go negative
+                    if(tail ==0) begin// this will allow the buffer to loop around and not go negative
                         tail <=32;
                     end
                     tail <= tail -1;
@@ -136,6 +137,4 @@ module tsc (
 
         endcase 
     end
-
-
 endmodule;
