@@ -20,7 +20,6 @@ module tsc (
     input wire [7:0] dat, // Data input from the ADC array   
     
     output reg req,      // Request signal to ADC
-    output wire rst,      // Reset signal for ADC // don't know if we need this
 
     // -----declaring the ext device comms
     input wire clk,
@@ -31,6 +30,7 @@ module tsc (
     output reg CD, 
     output reg TRD,
     output reg SD //serial data output
+    //test
 
 
 );
@@ -131,16 +131,7 @@ module tsc (
     always@(posedge clk) begin
         case (currentState)
             IDLE: begin
-                //Read ADC value here and compare to threshhold
-              /*  if(start) //go to running mode
-                    currentState <= RUNNING;
-                end
-                if(reset) //go to reset mode
-                    currentState <= RESET;
-                end
-                if(sendBuf) //go to sendBuffer mode
-                    currentState <= SENDBUFFER;
-                end*/
+                req <=0;
             end
             RECORD: begin
                 req <= 1'b1; // ask for adc to send data
