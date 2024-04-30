@@ -192,7 +192,7 @@ module tsc (
         endcase 
     end
     always@(negedge clk) begin
-        if(currentState == BUFFER_SEND) begin
+        if(currentState == SENDBUFFER) begin
             SD <= 0;
             //sends a low at the start of every bit
         end
