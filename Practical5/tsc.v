@@ -56,7 +56,7 @@ module tsc (
                 
     
     //setting the current state into the IDLE
-    reg [3:0] currentState = IDLE;
+    //reg [3:0] currentState = IDLE;
 
     //startup conditions
     initial
@@ -126,7 +126,7 @@ module tsc (
             IDLE: begin
                 //Read ADC value here and compare to threshhold
               /*  if(start) //go to running mode
-                    currentState <= RUNNING;
+                    currentState <= RECORD; //changed from RUNNING
                 end
                 if(reset) //go to reset mode
                     currentState <= RESET;
