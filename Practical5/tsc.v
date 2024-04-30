@@ -19,8 +19,8 @@ module tsc (
     input wire rdy,      // Ready signal from ADC
     input wire [7:0] dat, // Data input from the ADC array   
     
-    output wire req,      // Request signal to ADC
-    output wire rst,      // Reset signal for ADC
+    output reg req,      // Request signal to ADC
+    output wire rst,      // Reset signal for ADC // don't know if we need this
 
     // -----declaring the ext device comms
     input wire clk,
@@ -28,7 +28,7 @@ module tsc (
     input wire reset,
     input wire SBF,
     
-    output reg [31:0] CD, 
+    output reg CD, 
     output reg TRD,
     output reg SD //serial data output
 
@@ -46,7 +46,7 @@ module tsc (
     reg [0:4] tail;
 
     reg [0:3] index; // this is the index for outputting the variable
-
+    reg dataAvaliable; // this will be triggered if that data is available to read
     //making local params for readability of the states
     localparam  RESET = 3'b100,
                 IDLE = 3'b000,
@@ -56,7 +56,7 @@ module tsc (
                 
     
     //setting the current state into the IDLE
-    //reg [3:0] currentState = IDLE;
+    reg [3:0] currentState = IDLE;
 
     //startup conditions
     initial
@@ -64,6 +64,8 @@ module tsc (
            currentState <= RESET;
            timer <= 32'h00; 
            index <= 0;
+           SD <= 0;
+           req <= 0;
             /*
            ringBuf[ 0] = 8'h0;
            //creating an empty ringbuff
@@ -111,6 +113,11 @@ module tsc (
         tail <= 5'h1;
         TRD <= 1'b0;
         CD <= 1'b0;
+        req <= 0;
+        dataAvaliable = 0;
+    end
+    always@(posedge rdy)begin
+        dataAvaliable = 1'b1; // you are allowed to read from ADC
     end
 
     always@(posedge start) begin
@@ -126,7 +133,7 @@ module tsc (
             IDLE: begin
                 //Read ADC value here and compare to threshhold
               /*  if(start) //go to running mode
-                    currentState <= RECORD; //changed from RUNNING
+                    currentState <= RUNNING;
                 end
                 if(reset) //go to reset mode
                     currentState <= RESET;
@@ -136,35 +143,39 @@ module tsc (
                 end*/
             end
             RECORD: begin
-                timer <= timer +1; // increment the clock
-                tail <= (tail+1)%32;
-                ringBuf[tail] <= dat; // store the data in the ring buffer    
-                if(head === tail) begin // if it has gone around the loop shift 
-                    head <= (head +1) % 32;
-                end    
-                if(dat > trigVal) begin //now need to shift into a new state if the trigger value is high enough
-                    trigTM <= timer;
-                    currentState <= TRIGGERED;
-                end   
+                req <= 1'b1; // ask for adc to send data
+                if(dataAvaliable) begin
+                    timer <= timer +1; // increment the clock
+                    tail <= (tail+1)%32;
+                    ringBuf[tail] <= dat; // store the data in the ring buffer    
+                    if(head === tail) begin // if it has gone around the loop shift 
+                        head <= (head +1) % 32;
+                    end    
+                    if(dat > trigVal) begin //now need to shift into a new state if the trigger value is high enough
+                        trigTM <= timer;
+                        currentState <= TRIGGERED;
+                    end   
+                end
                  //increment the tail
             end
             TRIGGERED: begin
                 //needs to store the next 16 values from adc
-                timer <= timer +1;//increment the timer
-                if((timer - trigTM)< 16) begin
-                    ringBuf[tail] <= dat;
-                    tail <= tail+ 1;   
+                if(dataAvaliable == 1) begin
+                    timer <= timer +1;//increment the timer
+                    if((timer - trigTM)< 16) begin
+                        ringBuf[tail] <= dat;
+                        tail <= tail+ 1;   
+                    end
+                    else begin
+                        currentState <= IDLE;
+                        TRD = 1'b1;
+                        SD <= 1'b0; //start condition
+                        CD <= 1'b0; // not complete
+                    end
+                    if(head == tail) begin // if it has gone around the loop shift 
+                            head <= (head +1) % 32;
+                    end
                 end
-                else begin
-                    currentState <= IDLE;
-                    TRD = 1'b1;
-                    SD <= 1'b0; //start condition
-                    CD <= 1'b0; // not complete
-                end
-                if(head == tail) begin // if it has gone around the loop shift 
-                        head <= (head +1) % 32;
-                end
-                
             end
             SENDBUFFER: begin
             //needs to send ring buff out via SD Lin               
@@ -175,7 +186,7 @@ module tsc (
                         index <= index +1;
                     end    
                     else begin //once sent out a byte -> go to the next item
-                        SD <=0; // sets SD to zero at the start of every byte
+                        SD <=1; // sets SD to zero at the start of every byte
                         index <= 0; //resetting to the starts of a vyte
                         if(tail ==0) begin// this will allow the buffer to loop around and not go negative
                             tail <=32;
@@ -184,7 +195,7 @@ module tsc (
                     end
                 end
                 else begin
-                    CD <= 1'b0; //data sent through
+                    CD <= 1'b1; //data sent through
                     currentState <= IDLE;
                 end
             end    
