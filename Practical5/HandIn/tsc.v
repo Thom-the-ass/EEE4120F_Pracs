@@ -128,17 +128,17 @@ module tsc (
             //needs to send ring buff out via SD Lin               
                 if(tail!=head) begin // if havn't sent out whole buffer keep sending
                     if(index < 8) begin // if havent completed a byte yet keep trying
-                        SD <= ringBuf[tail][index]; 
+                        SD <= ringBuf[head][index]; 
                         //sendsout a bit from the ring buf
                         index <= index +1;
                     end    
                     else begin //once sent out a byte -> go to the next item
                         SD <=1; // sets SD to zero at the start of every byte
                         index <= 0; //resetting to the starts of a vyte
-                        if(tail ==0) begin// this will allow the buffer to loop around and not go negative
-                            tail <=32;
+                        if(head ==31) begin// this will allow the buffer to loop around and not go negative
+                            head <=0;
                         end
-                        tail <= tail -1; // decrementing the tail
+                        head <= head + 1; //incrementing the head , sending out the oldest data first
                     end
                 end
                 else begin
